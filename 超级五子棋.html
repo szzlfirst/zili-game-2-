@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>真人体验五子棋</title>
+    <style>
+        /* 保持原有样式不变，只添加以下新样式 */
+        .thinking {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 18px;
+            display: none;
+            z-index: 20;
+        }
+        
+        .pressure-indicator {
+            width: 100%;
+            height: 10px;
+            background-color: #f0f0f0;
+            margin-top: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .pressure-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(to right, #4CAF50, #FFC107, #F44336);
+            transition: width 0.5s;
+        }
+    </style>
+</head>
+<body>
+    <!-- 保持原有HTML结构不变，只添加以下新元素 -->
+    <div class="thinking" id="thinkingIndicator">对手思考中...</div>
+    <div class="pressure-indicator">
+        <div class="pressure-bar" id="pressureBar"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 新增变量
+            let pressureLevel = 0;
+            let humanLikeDelay = 1000; // AI思考基础延迟
+            let mistakeProbability = 0.2; // AI犯错基础概率
+            
+            // 难度设置（增强真人体验）
+            const difficultySettings = {
+                easy: { blockThree: 0.5, blockFour: 0.4, pressure: 20, winProb: 0.8, delay: 1500, mistake: 0.3 },
+                normal: { blockThree: 0.6, blockFour: 0.5, pressure: 40, winProb: 0.6, delay: 1200, mistake: 0.2 },
+                medium: { blockThree: 0.7, blockFour: 0.6, pressure: 60, winProb: 0.4, delay: 1000, mistake: 0.15 },
+                hard: { blockThree: 0.8, blockFour: 0.7, pressure: 70, winProb: 0.3, delay: 800, mistake: 0.1 },
+                extreme: { blockThree: 0.9, blockFour: 0.8, pressure: 80, winProb: 0.2, delay: 600, mistake: 0.05 },
+                hell: { blockThree: 1.0, blockFour: 0.9, pressure: 90, winProb: 0.1, delay: 400, mistake: 0.02 },
+                myth: { blockThree: 1.0, blockFour: 1.0, pressure: 100, winProb: 0.0, delay: 200, mistake: 0.0 }
+            };
+            
+            // 获取DOM元素
+            const thinkingIndicator = document.getElementById('thinkingIndicator');
+            const pressureBar = document.getElementById('pressureBar');
+            
+            // 修改AI移动函数以增加真人体验
+            function getAIMove() {
+                const difficulty = difficultySelect.value;
+                const settings = difficultySettings[difficulty];
+                
+                // 更新压力指示器
+                pressureLevel = settings.pressure;
+                pressureBar.style.width = `${pressureLevel}%`;
+                
+                // 显示思考指示器
+                thinkingIndicator.style.display = 'block';
+                
+                return new Promise(resolve => {
+                    // 模拟人类思考时间
+                    setTimeout(() => {
+                        thinkingIndicator.style.display = 'none';
+                        
+                        // 模拟人类可能的失误
+                        if (Math.random() < settings.mistake) {
+                            const emptyCells = getEmptyCells();
+                            if (emptyCells.length > 0) {
+                                resolve(emptyCells[Math.floor(Math.random() * emptyCells.length)]);
+                                return;
+                            }
+                        }
+                        
+                        // 原始AI逻辑（根据难度调整）
+                        let move;
+                        
+                        // 1. 检查是否有四连需要拦截
+                        const fourBlock = findConsecutive('black', 4);
+                        if (fourBlock.length > 0 && Math.random() < settings.blockFour) {
+                            move = fourBlock[0];
+                        }
+                        
+                        // 2. 检查是否有三连需要拦截
+                        const threeBlock = findConsecutive('black', 3);
+                        if (!move && threeBlock.length > 0 && Math.random() < settings.blockThree) {
+                            move = threeBlock[0];
+                        }
+                        
+                        // 3. 检查AI是否有四连可以完成
+                        const aiFourWin = findConsecutive('white', 4);
+                        if (!move && aiFourWin.length > 0) {
+                            move = aiFourWin[0];
+                        }
+                        
+                        // 4. 检查AI是否有三连可以扩展
+                        const aiThreeExtend = findConsecutive('white', 3);
+                        if (!move && aiThreeExtend.length > 0) {
+                            move = aiThreeExtend[0];
+                        }
+                        
+                        // 5. 如果没有策略性移动，根据难度选择最佳或随机移动
+                        if (!move) {
+                            const emptyCells = getEmptyCells();
+                            if (emptyCells.length > 0) {
+                                // 高难度下更倾向于中心区域
+                                if (difficulty === 'myth' || difficulty === 'hell') {
+                                    emptyCells.sort((a, b) => {
+                                        const aDist = Math.sqrt(Math.pow(a.row-11, 2) + Math.pow(a.col-11, 2));
+                                        const bDist = Math.sqrt(Math.pow(b.row-11, 2) + Math.pow(b.col-11, 2));
+                                        return aDist - bDist;
+                                    });
+                                    move = emptyCells[0];
+                                } else {
+                                    move = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                                }
+                            }
+                        }
+                        
+                        resolve(move);
+                    }, settings.delay);
+                });
+            }
+            
+            // 获取所有空单元格
+            function getEmptyCells() {
+                const emptyCells = [];
+                for (let row = 0; row < 23; row++) {
+                    for (let col = 0; col < 23; col++) {
+                        if (board[row][col] === null) {
+                            emptyCells.push({row, col});
+                        }
+                    }
+                }
+                return emptyCells;
+            }
+            
+            // 修改AI回合处理
+            async function handleAITurn() {
+                if (aiToggle.checked && currentPlayer === 'white' && !gameOver) {
+                    const aiMove = await getAIMove();
+                    if (aiMove) {
+                        placePiece(aiMove.row, aiMove.col, 'white');
+                        
+                        if (checkWin(aiMove.row, aiMove.col, 'white')) {
+                            endGame('white');
+                        } else {
+                            currentPlayer = 'black';
+                            updateStatus();
+                        }
+                    }
+                }
+            }
+            
+            // 修改点击处理函数
+            async function handleCellClick(row, col) {
+                if (gameOver || board[row][col] !== null) return;
+                
+                placePiece(row, col, currentPlayer);
+                
+                if (checkWin(row, col, currentPlayer)) {
+                    endGame(currentPlayer);
+                    return;
+                }
+                
+                currentPlayer = 'white';
+                updateStatus();
+                
+                await handleAITurn();
+            }
+            
+            // 初始化游戏时重置压力指示器
+            function resetGame() {
+                // ... 保持原有重置逻辑不变 ...
+                pressureLevel = 0;
+                pressureBar.style.width = '0%';
+            }
+        });
+    </script>
+</body>
+</html>

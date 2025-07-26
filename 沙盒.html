@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高清2D像素沙盒游戏</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #87CEEB;
+            touch-action: none;
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        #game-canvas {
+            display: block;
+            background-color: #87CEEB;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        #inventory {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 10px;
+            z-index: 100;
+        }
+        .inventory-slot {
+            width: 60px;
+            height: 60px;
+            margin: 0 5px;
+            border: 3px solid #555;
+            border-radius: 8px;
+            background-color: #8B4513;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            position: relative;
+            image-rendering: pixelated;
+        }
+        .inventory-slot.selected {
+            border: 3px solid gold;
+            box-shadow: 0 0 15px gold;
+        }
+        .inventory-slot img {
+            width: 50px;
+            height: 50px;
+            image-rendering: pixelated;
+            object-fit: contain;
+        }
+        .block-count {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 5px;
+            padding: 2px 6px;
+        }
+        #debug-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+        }
+        #controls-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+        }
+        #mobile-controls {
+            position: absolute;
+            bottom: 120px;
+            width: 100%;
+            display: none;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+        .mobile-btn {
+            width: 70px;
+            height: 70px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            user-select: none;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+        }
+        @media (max-width: 768px) {
+            #mobile-controls {
+                display: flex;
+            }
+            .inventory-slot {
+                width: 50px;
+                height: 50px;
+            }
+            .inventory-slot img {
+                width: 40px;
+                height: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        <div id="debug-info"></div>
+        <div id="controls-info">
+            <div>W - 跳跃</div>
+            <div>A - 左移</div>
+            <div>S - 下蹲</div>
+            <div>D - 右移</div>
+            <div>1-7 - 选择方块</div>
+            <div>左键 - 破坏</div>
+            <div>右键 - 放置</div>
+        </div>
+        <div id="mobile-controls">
+            <div class="mobile-btn" id="left-btn">A</div>
+            <div class="mobile-btn" id="right-btn">D</div>
+            <div class="mobile-btn" id="jump-btn">W</div>
+        </div>
+        <div id="inventory"></div>
+    </div>
+
+    <script>
+        // 游戏常量
+        const BLOCK_SIZE = 50;  // 增大方块尺寸提高清晰度
+        const PLAYER_WIDTH = 40;
+        const PLAYER_HEIGHT = 70;
+        const GRAVITY = 0.6;
+        const JUMP_FORCE = -15;
+        const MOVE_SPEED = 6;
+        const WORLD_WIDTH = 100;
+        const WORLD_HEIGHT = 30;
+        const VIEWPORT_WIDTH = 20;
+        const VIEWPORT_HEIGHT = 15;
+
+        // 方块类型（增加更多细节颜色）
+        const BLOCK_TYPES = {
+            AIR: { id: 0, name: "空气", color: "transparent" },
+            GRASS: { id: 1, name: "草方块", color: "#5FBF4F", topColor: "#3A8F2D", sideColor: "#5F4F3F" },
+            DIRT: { id: 2, name: "泥土", color: "#8B5A2B", topColor: "#6B4A2B", sideColor: "#5A3A1B" },
+            STONE: { id: 3, name: "石头", color: "#808080", topColor: "#707070", sideColor: "#606060" },
+            SAND: { id: 4, name: "沙子", color: "#F4D03F", topColor: "#E4C02F", sideColor: "#D4B01F" },
+            WOOD: { id: 5, name: "木头", color: "#8B4513", topColor: "#6B3513", sideColor: "#5A2A0B" },
+            LEAVES: { id: 6, name: "树叶", color: "#2ECC71", topColor: "#1EBC61", sideColor: "#0EAC51" },
+            WATER: { id: 7, name: "水", color: "#3498DB", topColor: "#2488CB", sideColor: "#1478BB" },
+            BRICK: { id: 8, name: "砖块", color: "#E74C3C", topColor: "#D73C2C", sideColor: "#C72C1C" }
+        };
+
+        // 物品数据
+        const ITEMS = [
+            { id: 1, name: "草方块", type: BLOCK_TYPES.GRASS },
+            { id: 2, name: "泥土", type: BLOCK_TYPES.DIRT },
+            { id: 3, name: "石头", type: BLOCK_TYPES.STONE },
+            { id: 4, name: "沙子", type: BLOCK_TYPES.SAND },
+            { id: 5, name: "木头", type: BLOCK_TYPES.WOOD },
+            { id: 6, name: "树叶", type: BLOCK_TYPES.LEAVES },
+            { id: 7, name: "砖块", type: BLOCK_TYPES.BRICK }
+        ];
+
+        // 游戏状态
+        const gameState = {
+            canvas: null,
+            ctx: null,
+            world: [],
+            player: {
+                x: 100,
+                y: 100,
+                width: PLAYER_WIDTH,
+                height: PLAYER_HEIGHT,
+                velX: 0,
+                velY: 0,
+                isJumping: false,
+                facingRight: true,
+                isCrouching: false
+            },
+            camera: {
+                x: 0,
+                y: 0
+            },
+            inventory: [],
+            selectedSlot: 0,
+            keys: {
+                a: false,
+                d: false,
+                w: false,
+                s: false
+            },
+            mouse: {
+                x: 0,
+                y: 0,
+                isDown: false
+            },
+            touch: {
+                isActive: false,
+                x: 0,
+                y: 0
+            },
+            debug: {
+                show: true,
+                fps: 0,
+                lastTime: 0
+            }
+        };
+
+        // 初始化游戏
+        function initGame() {
+            gameState.canvas = document.getElementById('game-canvas');
+            gameState.ctx = gameState.canvas.getContext('2d', { willReadFrequently: true });
+            
+            // 设置画布大小
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // 生成世界
+            generateWorld();
+            
+            // 初始化玩家物品栏
+            initInventory();
+            
+            // 设置事件监听
+            setupEventListeners();
+            
+            // 开始游戏循环
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 调整画布大小
+        function resizeCanvas() {
+            gameState.canvas.width = window.innerWidth;
+            gameState.canvas.height = window.innerHeight;
+        }
+
+        // 生成世界（增加更多地形变化）
+        function generateWorld() {
+            // 创建空世界
+            for (let y = 0; y < WORLD_HEIGHT; y++) {
+                gameState.world[y] = [];
+                for (let x = 0; x < WORLD_WIDTH; x++) {
+                    gameState.world[y][x] = BLOCK_TYPES.AIR;
+                }
+            }
+
+            // 生成地形
+            const baseHeight = 12;
+            const stoneHeight = 7;
+            const amplitude = 3; // 地形波动幅度
+            const frequency = 0.1; // 地形波动频率
+            
+            for (let x = 0; x < WORLD_WIDTH; x++) {
+                // 计算地形高度波动
+                const heightVariation = Math.floor(Math.sin(x * frequency) * amplitude);
+                const groundLevel = WORLD_HEIGHT - baseHeight + heightVariation;
+                
+                // 石头层
+                for (let y = groundLevel + stoneHeight; y < WORLD_HEIGHT; y++) {
+                    gameState.world[y][x] = BLOCK_TYPES.STONE;
+                }
+                
+                // 泥土层
+                for (let y = groundLevel; y < groundLevel + stoneHeight; y++) {
+                    gameState.world[y][x] = BLOCK_TYPES.DIRT;
+                }
+                
+                // 草方块
+                gameState.world[groundLevel - 1][x] = BLOCK_TYPES.GRASS;
+                
+                // 随机生成沙子
+                if (Math.random() < 0.1 && x > 10 && x < WORLD_WIDTH - 10) {
+                    const sandWidth = Math.floor(Math.random() * 5) + 3;
+                    for (let dx = 0; dx < sandWidth; dx++) {
+                        if (x + dx < WORLD_WIDTH) {
+                            gameState.world[groundLevel][x + dx] = BLOCK_TYPES.SAND;
+                            gameState.world[groundLevel - 1][x + dx] = BLOCK_TYPES.SAND;
+                        }
+                    }
+                }
+            }
+            
+            // 生成一些树（增加更多细节）
+            for (let i = 0; i < 8; i++) {
+                const treeX = Math.floor(Math.random() * (WORLD_WIDTH - 6)) + 3;
+                const groundLevel = getGroundLevel(treeX);
+                const treeY = groundLevel - 1;
+                const treeHeight = Math.floor(Math.random() * 4) + 4;
+                
+                // 树干
+                for (let y = treeY; y > treeY - treeHeight; y--) {
+                    if (y >= 0) gameState.world[y][treeX] = BLOCK_TYPES.WOOD;
+                }
+                
+                // 树叶（更自然的形状）
+                const leafRadius = Math.floor(Math.random() * 2) + 2;
+                for (let dy = -leafRadius; dy <= leafRadius; dy++) {
+                    for (let dx = -leafRadius; dx <= leafRadius; dx++) {
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        if (dist <= leafRadius + 0.5) {
+                            const leafY = treeY - treeHeight + dy;
+                            const leafX = treeX + dx;
+                            if (leafY >= 0 && leafX >= 0 && leafX < WORLD_WIDTH && 
+                                gameState.world[leafY][leafX] === BLOCK_TYPES.AIR) {
+                                gameState.world[leafY][leafX] = BLOCK_TYPES.LEAVES;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 生成一些水坑（更自然形状）
+            for (let i = 0; i < 5; i++) {
+                const waterX = Math.floor(Math.random() * (WORLD_WIDTH - 8)) + 4;
+                const groundLevel = getGroundLevel(waterX);
+                const waterY = groundLevel;
+                const width = Math.floor(Math.random() * 5) + 4;
+                const depth = Math.floor(Math.random() * 3) + 2;
+                
+                // 生成圆形水坑
+                const centerX = waterX + width/2;
+                const centerY = waterY + depth/2;
+                const radiusX = width/2;
+                const radiusY = depth/2;
+                
+                for (let dx = -radiusX; dx <= radiusX; dx++) {
+                    for (let dy = -radiusY; dy <= radiusY; dy++) {
+                        const nx = dx / radiusX;
+                        const ny = dy / radiusY;
+                        if (nx*nx + ny*ny <= 1) {
+                            const wx = Math.floor(centerX + dx);
+                            const wy = Math.floor(centerY + dy);
+                            if (wx >= 0 && wx < WORLD_WIDTH && wy >= 0 && wy < WORLD_HEIGHT) {
+                                gameState.world[wy][wx] = BLOCK_TYPES.WATER;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 生成一些砖块结构（增加更多变化）
+            for (let i = 0; i < 4; i++) {
+                const brickX = Math.floor(Math.random() * (WORLD_WIDTH - 6)) + 3;
+                const groundLevel = getGroundLevel(brickX);
+                const brickY = groundLevel - 4;
+                const width = Math.floor(Math.random() * 3) + 3;
+                const height = Math.floor(Math.random() * 3) + 2;
+                
+                for (let dy = 0; dy < height; dy++) {
+                    for (let dx = 0; dx < width; dx++) {
+                        const y = brickY + dy;
+                        const x = brickX + dx;
+                        if (y >= 0 && x < WORLD_WIDTH) {
+                            gameState.world[y][x] = BLOCK_TYPES.BRICK;
+                        }
+                    }
+                }
+            }
+            
+            // 生成一些山洞
+            for (let i = 0; i < 3; i++) {
+                const caveX = Math.floor(Math.random() * (WORLD_WIDTH - 20)) + 10;
+                const groundLevel = getGroundLevel(caveX);
+                const caveY = groundLevel + 2;
+                const caveWidth = Math.floor(Math.random() * 10) + 8;
+                const caveHeight = Math.floor(Math.random() * 4) + 3;
+                
+                for (let dx = 0; dx < caveWidth; dx++) {
+                    for (let dy = 0; dy < caveHeight; dy++) {
+                        const y = caveY + dy;
+                        const x = caveX + dx;
+                        if (y < WORLD_HEIGHT && x < WORLD_WIDTH) {
+                            gameState.world[y][x] = BLOCK_TYPES.AIR;
+                        }
+                    }
+                }
+            }
+            
+            function getGroundLevel(x) {
+                const baseHeight = 12;
+                const amplitude = 3;
+                const frequency = 0.1;
+                return WORLD_HEIGHT - baseHeight + Math.floor(Math.sin(x * frequency) * amplitude);
+            }
+        }
+
+        // 初始化物品栏
+        function initInventory() {
+            gameState.inventory = ITEMS.map(item => ({
+                ...item,
+                count: 99
+            }));
+            
+            renderInventory();
+        }
+
+        // 渲染物品栏
+        function renderInventory() {
+            const inventoryEl = document.getElementById('inventory');
+            inventoryEl.innerHTML = '';
+            
+            gameState.inventory.forEach((item, index) => {
+                const slot = document.createElement('div');
+                slot.className = `inventory-slot ${index === gameState.selectedSlot ? 'selected' : ''}`;
+                slot.dataset.index = index;
+                
+                const block = document.createElement('div');
+                block.style.width = '50px';
+                block.style.height = '50px';
+                block.style.backgroundColor = item.type.color;
+                block.style.borderTop = `5px solid ${item.type.topColor || item.type.color}`;
+                block.style.borderLeft = `5px solid ${item.type.sideColor || item.type.color}`;
+                block.style.borderRight = `5px solid ${item.type.sideColor || item.type.color}`;
+                block.style.imageRendering = 'pixelated';
+                
+                const count = document.createElement('div');
+                count.className = 'block-count';
+                count.textContent = item.count;
+                
+                slot.appendChild(block);
+                slot.appendChild(count);
+                slot.addEventListener('click', () => {
+                    gameState.selectedSlot = index;
+                    renderInventory();
+                });
+                
+                inventoryEl.appendChild(slot);
+            });
+        }
+
+        // 设置事件监听（修改为WASD控制）
+        function setupEventListeners() {
+            // 键盘控制
+            window.addEventListener('keydown', (e) => {
+                switch (e.key.toLowerCase()) {
+                    case 'a':
+                        gameState.keys.a = true;
+                        gameState.player.facingRight = false;
+                        break;
+                    case 'd':
+                        gameState.keys.d = true;
+                        gameState.player.facingRight = true;
+                        break;
+                    case 'w':
+                        if (!gameState.player.isJumping) {
+                            gameState.player.velY = JUMP_FORCE;
+                            gameState.player.isJumping = true;
+                        }
+                        break;
+                    case 's':
+                        gameState.player.isCrouching = true;
+                        gameState.player.height = PLAYER_HEIGHT * 0.7;
+                        break;
+                    case '1':
+                    case '2':
+                    case '3':
+                    case '4':
+                    case '5':
+                    case '6':
+                    case '7':
+                        gameState.selectedSlot = parseInt(e.key) - 1;
+                        renderInventory();
+                        break;
+                    case 'f':
+                        gameState.debug.show = !gameState.debug.show;
+                        break;
+                }
+            });
+            
+            window.addEventListener('keyup', (e) => {
+                switch (e.key.toLowerCase()) {
+                    case 'a':
+                        gameState.keys.a = false;
+                        break;
+                    case 'd':
+                        gameState.keys.d = false;
+                        break;
+                    case 's':
+                        gameState.player.isCrouching = false;
+                        gameState.player.height = PLAYER_HEIGHT;
+                        break;
+                }
+            });
+            
+            // 鼠标控制
+            gameState.canvas.addEventListener('mousemove', (e) => {
+                const rect = gameState.canvas.getBoundingClientRect();
+                gameState.mouse.x = e.clientX - rect.left + gameState.camera.x;
+                gameState.mouse.y = e.clientY - rect.top + gameState.camera.y;
+            });
+            
+            gameState.canvas.addEventListener('mousedown', (e) => {
+                gameState.mouse.isDown = true;
+                handleBlockInteraction(e.clientX, e.clientY, e.button === 2);
+            });
+            
+            gameState.canvas.addEventListener('mouseup', () => {
+                gameState.mouse.isDown = false;
+            });
+            
+            gameState.canvas.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+            });
+            
+            // 触摸控制
+            gameState.canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                gameState.touch.isActive = true;
+                const touch = e.touches[0];
+                const rect = gameState.canvas.getBoundingClientRect();
+                gameState.touch.x = touch.clientX - rect.left + gameState.camera.x;
+                gameState.touch.y = touch.clientY - rect.top + gameState.camera.y;
+                
+                handleBlockInteraction(touch.clientX, touch.clientY, false);
+            });
+            
+            gameState.canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = gameState.canvas.getBoundingClientRect();
+                gameState.touch.x = touch.clientX - rect.left + gameState.camera.x;
+                gameState.touch.y = touch.clientY - rect.top + gameState.camera.y;
+            });
+            
+            gameState.canvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                gameState.touch.isActive = false;
+            });
+            
+            // 移动控制按钮
+            document.getElementById('left-btn').addEventListener('touchstart', () => gameState.keys.a = true);
+            document.getElementById('left-btn').addEventListener('touchend', () => gameState.keys.a = false);
+            document.getElementById('right-btn').addEventListener('touchstart', () => gameState.keys.d = true);
+            document.getElementById('right-btn').addEventListener('touchend', () => gameState.keys.d = false);
+            document.getElementById('jump-btn').addEventListener('touchstart', () => {
+                if (!gameState.player.isJumping) {
+                    gameState.player.velY = JUMP_FORCE;
+                    gameState.player.isJumping = true;
+                }
+            });
+        }
+
+        // 处理方块交互
+        function handleBlockInteraction(clientX, clientY, isRightClick) {
+            const rect = gameState.canvas.getBoundingClientRect();
+            const worldX = Math.floor((clientX - rect.left + gameState.camera.x) / BLOCK_SIZE);
+            const worldY = Math.floor((clientY - rect.top + gameState.camera.y) / BLOCK_SIZE);
+            
+            // 确保坐标在世界范围内
+            if (worldX < 0 || worldX >= WORLD_WIDTH || worldY < 0 || worldY >= WORLD_HEIGHT) {
+                return;
+            }
+            
+            // 计算玩家位置
+            const playerBlockX = Math.floor(gameState.player.x / BLOCK_SIZE);
+            const playerBlockY = Math.floor(gameState.player.y / BLOCK_SIZE);
+            
+            // 检查是否在玩家附近（防止远程放置/破坏）
+            if (Math.abs(worldX - playerBlockX) > 5 || Math.abs(worldY - playerBlockY) > 5) {
+                return;
+            }
+            
+            if (isRightClick) {
+                // 放置方块
+                const selectedItem = gameState.inventory[gameState.selectedSlot];
+                if (selectedItem && selectedItem.count > 0 && 
+                    gameState.world[worldY][worldX] === BLOCK_TYPES.AIR) {
+                    gameState.world[worldY][worldX] = selectedItem.type;
+                    selectedItem.count--;
+                    renderInventory();
+                }
+            } else {
+                // 破坏方块
+                if (gameState.world[worldY][worldX] !== BLOCK_TYPES.AIR && 
+                    gameState.world[worldY][worldX] !== BLOCK_TYPES.WATER) {
+                    // 添加到物品栏
+                    const blockType = gameState.world[worldY][worldX];
+                    const itemIndex = gameState.inventory.findIndex(item => item.type === blockType);
+                    if (itemIndex !== -1) {
+                        gameState.inventory[itemIndex].count++;
+                    }
+                    
+                    gameState.world[worldY][worldX] = BLOCK_TYPES.AIR;
+                    renderInventory();
+                }
+            }
+        }
+
+        // 游戏主循环
+        function gameLoop(timestamp) {
+            // 计算FPS
+            if (gameState.debug.lastTime) {
+                gameState.debug.fps = Math.round(1000 / (timestamp - gameState.debug.lastTime));
+            }
+            gameState.debug.lastTime = timestamp;
+            
+            // 更新游戏状态
+            updateGame();
+            
+            // 渲染游戏
+            renderGame();
+            
+            // 继续循环
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 更新游戏状态
+        function updateGame() {
+            // 玩家移动
+            gameState.player.velX = 0;
+            if (gameState.keys.a) {
+                gameState.player.velX = -MOVE_SPEED;
+                gameState.player.facingRight = false;
+            }
+            if (gameState.keys.d) {
+                gameState.player.velX = MOVE_SPEED;
+                gameState.player.facingRight = true;
+            }
+            
+            // 下蹲时移动速度减半
+            if (gameState.player.isCrouching) {
+                gameState.player.velX *= 0.5;
+            }
+            
+            // 应用重力
+            gameState.player.velY += GRAVITY;
+            
+            // 限制下落速度
+            if (gameState.player.velY > 15) {
+                gameState.player.velY = 15;
+            }
+            
+            // 保存旧位置用于碰撞检测
+            const oldX = gameState.player.x;
+            const oldY = gameState.player.y;
+            
+            // 更新位置
+            gameState.player.x += gameState.player.velX;
+            gameState.player.y += gameState.player.velY;
+            
+            // 碰撞检测 - X轴
+            if (gameState.player.velX !== 0) {
+                if (checkCollision()) {
+                    gameState.player.x = oldX;
+                }
+            }
+            
+            // 碰撞检测 - Y轴
+            if (gameState.player.velY !== 0) {
+                if (checkCollision()) {
+                    gameState.player.y = oldY;
+                    gameState.player.velY = 0;
+                    gameState.player.isJumping = false;
+                }
+            }
+            
+            // 更新相机位置（平滑跟随）
+            const targetX = gameState.player.x - gameState.canvas.width / 2 + PLAYER_WIDTH / 2;
+            const targetY = gameState.player.y - gameState.canvas.height / 2 + PLAYER_HEIGHT / 2;
+            
+            gameState.camera.x += (targetX - gameState.camera.x) * 0.1;
+            gameState.camera.y += (targetY - gameState.camera.y) * 0.1;
+            
+            // 限制相机范围
+            gameState.camera.x = Math.max(0, Math.min(gameState.camera.x, WORLD_WIDTH * BLOCK_SIZE - gameState.canvas.width));
+            gameState.camera.y = Math.max(0, Math.min(gameState.camera.y, WORLD_HEIGHT * BLOCK_SIZE - gameState.canvas.height));
+            
+            // 处理持续建造/破坏
+            if (gameState.mouse.isDown) {
+                handleBlockInteraction(gameState.mouse.x + gameState.camera.x - gameState.canvas.width / 2, 
+                                      gameState.mouse.y + gameState.camera.y - gameState.canvas.height / 2, 
+                                      false);
+            }
+            
+            if (gameState.touch.isActive) {
+                handleBlockInteraction(gameState.touch.x + gameState.camera.x - gameState.canvas.width / 2, 
+                                      gameState.touch.y + gameState.camera.y - gameState.canvas.height / 2, 
+                                      false);
+            }
+        }
+
+        // 碰撞检测（改进版）
+        function checkCollision() {
+            // 检查玩家四个角
+            const points = [
+                { x: gameState.player.x, y: gameState.player.y }, // 左上
+                { x: gameState.player.x + PLAYER_WIDTH, y: gameState.player.y }, // 右上
+                { x: gameState.player.x, y: gameState.player.y + gameState.player.height }, // 左下
+                { x: gameState.player.x + PLAYER_WIDTH, y: gameState.player.y + gameState.player.height } // 右下
+            ];
+            
+            for (const point of points) {
+                const blockX = Math.floor(point.x / BLOCK_SIZE);
+                const blockY = Math.floor(point.y / BLOCK_SIZE);
+                
+                // 检查是否在世界范围内
+                if (blockX < 0 || blockX >= WORLD_WIDTH || blockY < 0 || blockY >= WORLD_HEIGHT) {
+                    return true;
+                }
+                
+                // 检查是否是固体方块
+                const block = gameState.world[blockY][blockX];
+                if (block !== BLOCK_TYPES.AIR && block !== BLOCK_TYPES.WATER && block !== BLOCK_TYPES.LEAVES) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        // 渲染游戏（高清改进版）
+        function renderGame() {
+            const ctx = gameState.ctx;
+            
+            // 清空画布
+            ctx.clearRect(0, 0, gameState.canvas.width, gameState.canvas.height);
+            
+            // 绘制天空（渐变效果）
+            const skyGradient = ctx.createLinearGradient(0, 0, 0, gameState.canvas.height);
+            skyGradient.addColorStop(0, '#87CEEB');
+            skyGradient.addColorStop(1, '#1E90FF');
+            ctx.fillStyle = skyGradient;
+            ctx.fillRect(0, 0, gameState.canvas.width, gameState.canvas.height);
+            
+            // 计算可见区块范围
+            const startX = Math.floor(gameState.camera.x / BLOCK_SIZE);
+            const startY = Math.floor(gameState.camera.y / BLOCK_SIZE);
+            const endX = Math.min(WORLD_WIDTH, startX + Math.ceil(gameState.canvas.width / BLOCK_SIZE) + 1);
+            const endY = Math.min(WORLD_HEIGHT, startY + Math.ceil(gameState.canvas.height / BLOCK_SIZE) + 1);
+            
+            // 绘制方块（增加3D效果）
+            for (let y = startY; y < endY; y++) {
+                for (let x = startX; x < endX; x++) {
+                    const block = gameState.world[y][x];
+                    if (block !== BLOCK_TYPES.AIR) {
+                        const screenX = x * BLOCK_SIZE - gameState.camera.x;
+                        const screenY = y * BLOCK_SIZE - gameState.camera.y;
+                        
+                        // 绘制方块主体
+                        ctx.fillStyle = block.color;
+                        ctx.fillRect(screenX, screenY, BLOCK_SIZE, BLOCK_SIZE);
+                        
+                        // 绘制顶部高光
+                        if (block.topColor) {
+                            ctx.fillStyle = block.topColor;
+                            ctx.fillRect(screenX, screenY, BLOCK_SIZE, 5);
+                        }
+                        
+                        // 绘制侧面阴影
+                        if (block.sideColor) {
+                            ctx.fillStyle = block.sideColor;
+                            ctx.fillRect(screenX, screenY, 5, BLOCK_SIZE);
+                        }
+                        
+                        // 绘制方块边框
+                        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                        ctx.strokeRect(screenX, screenY, BLOCK_SIZE, BLOCK_SIZE);
+                        
+                        // 特殊方块效果
+                        if (block === BLOCK_TYPES.WATER) {
+                            // 水波纹效果
+                            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                            const waveOffset = Math.sin(Date.now() / 500 + x * 0.3) * 2;
+                            ctx.fillRect(screenX, screenY + waveOffset, BLOCK_SIZE, 3);
+                        }
+                    }
+                }
+            }
+            
+            // 绘制玩家（更高清）
+            const playerScreenX = gameState.player.x - gameState.camera.x;
+            const playerScreenY = gameState.player.y - gameState.camera.y;
+            
+            // 玩家身体
+            ctx.fillStyle = gameState.player.facingRight ? '#FF4500' : '#FF6347';
+            ctx.fillRect(playerScreenX, playerScreenY, PLAYER_WIDTH, gameState.player.height);
+            
+            // 玩家头部
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(
+                playerScreenX + (gameState.player.facingRight ? PLAYER_WIDTH - 10 : 10),
+                playerScreenY + 15,
+                12,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+            
+            // 玩家眼睛
+            ctx.fillStyle = 'white';
+            const eyeX = gameState.player.facingRight ? PLAYER_WIDTH - 15 : 15;
+            ctx.beginPath();
+            ctx.arc(
+                playerScreenX + eyeX,
+                playerScreenY + 12,
+                5,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+            
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(
+                playerScreenX + eyeX + (gameState.player.facingRight ? 2 : -2),
+                playerScreenY + 12,
+                2,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+            
+            // 玩家手臂
+            const armSwing = Math.sin(Date.now() / 200) * 5 * (gameState.player.velX !== 0 ? 1 : 0);
+            ctx.fillStyle = '#CD3700';
+            ctx.fillRect(
+                playerScreenX + (gameState.player.facingRight ? PLAYER_WIDTH : -10),
+                playerScreenY + 20,
+                10,
+                20
+            );
+            ctx.fillRect(
+                playerScreenX + (gameState.player.facingRight ? -10 : PLAYER_WIDTH),
+                playerScreenY + 20 + armSwing,
+                10,
+                20
+            );
+            
+            // 玩家腿部
+            const legSwing = Math.sin(Date.now() / 200) * 5 * (gameState.player.velX !== 0 ? 1 : 0);
+            ctx.fillStyle = '#8B0000';
+            ctx.fillRect(
+                playerScreenX + 5,
+                playerScreenY + gameState.player.height - 10,
+                8,
+                20 + (gameState.player.isCrouching ? -10 : legSwing)
+            );
+            ctx.fillRect(
+                playerScreenX + PLAYER_WIDTH - 13,
+                playerScreenY + gameState.player.height - 10,
+                8,
+                20 + (gameState.player.isCrouching ? -10 : -legSwing)
+            );
+            
+            // 绘制调试信息
+            if (gameState.debug.show) {
+                ctx.fillStyle = 'white';
+                ctx.font = '16px Courier New';
+                ctx.fillText(`FPS: ${gameState.debug.fps}`, 20, 30);
+                ctx.fillText(`位置: X=${Math.floor(gameState.player.x)} Y=${Math.floor(gameState.player.y)}`, 20, 50);
+                ctx.fillText(`当前方块: ${gameState.inventory[gameState.selectedSlot].name}`, 20, 70);
+                ctx.fillText(`物品栏: 1-7选择`, 20, 90);
+            }
+        }
+
+        // 启动游戏
+        window.onload = initGame;
+    </script>
+</body>
+</html>

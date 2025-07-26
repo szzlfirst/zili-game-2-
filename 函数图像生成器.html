@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电子草稿本与函数绘图器</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        .notepad-container {
+            grid-column: 1;
+        }
+        .graph-container {
+            grid-column: 2;
+        }
+        .page-header {
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .page-content {
+            min-height: 200px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 20px;
+            background-color: #fffef7;
+            white-space: pre-wrap;
+        }
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #newContent {
+            width: 100%;
+            height: 100px;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .empty-page {
+            color: #999;
+            font-style: italic;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        input[type="range"] {
+            flex-grow: 1;
+        }
+        .value-display {
+            min-width: 40px;
+            text-align: right;
+        }
+        #quadraticChart {
+            width: 100%;
+            height: 300px;
+            margin-top: 20px;
+        }
+        @media (max-width: 768px) {
+            body {
+                grid-template-columns: 1fr;
+            }
+            .notepad-container, .graph-container {
+                grid-column: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="panel notepad-container">
+        <h1>电子草稿本</h1>
+        
+        <div class="toolbar">
+            <button id="addBtn">添加内容</button>
+            <button id="prevBtn">上一页</button>
+            <button id="nextBtn">下一页</button>
+            <button id="newPageBtn">新增页</button>
+            <button id="saveBtn">保存笔记</button>
+            <button id="clearBtn">清空当前页</button>
+        </div>
+        
+        <div class="page-header">
+            <h2 id="pageTitle">第 1 页</h2>
+        </div>
+        
+        <div class="page-content" id="currentPageContent"></div>
+        
+        <div id="editor" style="display: none;">
+            <textarea id="newContent" placeholder="输入您的内容..."></textarea>
+            <button id="confirmAdd">确认添加</button>
+            <button id="cancelAdd">取消</button>
+        </div>
+    </div>
+
+    <div class="panel graph-container">
+        <h1>二次函数绘图器</h1>
+        <p>y = ax² + bx + c</p>
+        
+        <div class="controls">
+            <label for="aCoeff">a 系数:</label>
+            <div class="slider-container">
+                <input type="range" id="aCoeff" min="-5" max="5" step="0.1" value="1">
+                <span class="value-display" id="aValue">1</span>
+            </div>
+            
+            <label for="bCoeff">b 系数:</label>
+            <div class="slider-container">
+                <input type="range" id="bCoeff" min="-10" max="10" step="0.1" value="0">
+                <span class="value-display" id="bValue">0</span>
+            </div>
+            
+            <label for="cCoeff">c 系数:</label>
+            <div class="slider-container">
+                <input type="range" id="cCoeff" min="-10" max="10" step="0.1" value="0">
+                <span class="value-display" id="cValue">0</span>
+            </div>
+        </div>
+        
+        <canvas id="quadraticChart"></canvas>
+    </div>
+
+    <script>
+        // 电子草稿本功能
+        class HTMLNotepad {
+            constructor() {
+                this.notes = [""];
+                this.currentPage = 0;
+                this.initElements();
+                this.bindEvents();
+                this.render();
+            }
+            
+            initElements() {
+                this.pageTitleEl = document.getElementById('pageTitle');
+                this.pageContentEl = document.getElementById('currentPageContent');
+                this.newContentEl = document.getElementById('newContent');
+                this.editorEl = document.getElementById('editor');
+                
+                // 按钮
+                this.addBtn = document.getElementById('addBtn');
+                this.prevBtn = document.getElementById('prevBtn');
+                this.nextBtn = document.getElementById('nextBtn');
+                this.newPageBtn = document.getElementById('newPageBtn');
+                this.saveBtn = document.getElementById('saveBtn');
+                this.clearBtn = document.getElementById('clearBtn');
+                this.confirmAddBtn = document.getElementById('confirmAdd');
+                this.cancelAddBtn = document.getElementById('cancelAdd');
+            }
+            
+            bindEvents() {
+                this.addBtn.addEventListener('click', () => this.showEditor());
+                this.prevBtn.addEventListener('click', () => this.prevPage());
+                this.nextBtn.addEventListener('click', () => this.nextPage());
+                this.newPageBtn.addEventListener('click', () => this.addNewPage());
+                this.saveBtn.addEventListener('click', () => this.saveNotes());
+                this.clearBtn.addEventListener('click', () => this.clearCurrentPage());
+                this.confirmAddBtn.addEventListener('click', () => this.addContent());
+                this.cancelAddBtn.addEventListener('click', () => this.hideEditor());
+            }
+            
+            render() {
+                this.pageTitleEl.textContent = `第 ${this.currentPage + 1} 页 / 共 ${this.notes.length} 页`;
+                const content = this.notes[this.currentPage];
+                this.pageContentEl.innerHTML = content || '<span class="empty-page">[空白页]</span>';
+                this.pageContentEl.style.minHeight = '200px';
+            }
+            
+            showEditor() {
+                this.editorEl.style.display = 'block';
+                this.newContentEl.focus();
+            }
+            
+            hideEditor() {
+                this.editorEl.style.display = 'none';
+                this.newContentEl.value = '';
+            }
+            
+            addContent() {
+                const newText = this.newContentEl.value.trim();
+                if (newText) {
+                    if (this.notes[this.currentPage]) {
+                        this.notes[this.currentPage] += '\n\n' + newText;
+                    } else {
+                        this.notes[this.currentPage] = newText;
+                    }
+                    this.render();
+                }
+                this.hideEditor();
+            }
+            
+            prevPage() {
+                if (this.currentPage > 0) {
+                    this.currentPage--;
+                    this.render();
+                } else {
+                    alert('已经是第一页了');
+                }
+            }
+            
+            nextPage() {
+                if (this.currentPage < this.notes.length - 1) {
+                    this.currentPage++;
+                    this.render();
+                } else {
+                    alert('已经是最后一页了');
+                }
+            }
+            
+            addNewPage() {
+                this.notes.push("");
+                this.currentPage = this.notes.length - 1;
+                this.render();
+            }
+            
+            clearCurrentPage() {
+                if (confirm('确定要清空当前页吗？')) {
+                    this.notes[this.currentPage] = "";
+                    this.render();
+                }
+            }
+            
+            saveNotes() {
+                let contentToSave = "";
+                this.notes.forEach((note, index) => {
+                    contentToSave += `=== 第 ${index + 1} 页 ===\n\n${note}\n\n`;
+                });
+                
+                const blob = new Blob([contentToSave], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = '电子草稿本.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                alert('笔记已保存为"电子草稿本.txt"');
+            }
+        }
+
+        // 二次函数绘图功能
+        class QuadraticGraph {
+            constructor() {
+                this.a = 1;
+                this.b = 0;
+                this.c = 0;
+                this.chart = null;
+                this.initElements();
+                this.bindEvents();
+                this.initChart();
+            }
+            
+            initElements() {
+                this.aCoeff = document.getElementById('aCoeff');
+                this.bCoeff = document.getElementById('bCoeff');
+                this.cCoeff = document.getElementById('cCoeff');
+                this.aValue = document.getElementById('aValue');
+                this.bValue = document.getElementById('bValue');
+                this.cValue = document.getElementById('cValue');
+                this.chartCanvas = document.getElementById('quadraticChart');
+            }
+            
+            bindEvents() {
+                this.aCoeff.addEventListener('input', () => this.updateCoefficient('a'));
+                this.bCoeff.addEventListener('input', () => this.updateCoefficient('b'));
+                this.cCoeff.addEventListener('input', () => this.updateCoefficient('c'));
+            }
+            
+            updateCoefficient(coeff) {
+                this[coeff] = parseFloat(document.getElementById(`${coeff}Coeff`).value);
+                document.getElementById(`${coeff}Value`).textContent = this[coeff].toFixed(1);
+                this.updateChart();
+            }
+            
+            initChart() {
+                const ctx = this.chartCanvas.getContext('2d');
+                this.chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        datasets: [{
+                            label: '二次函数',
+                            borderColor: 'rgb(75, 192, 192)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            x: {
+                                type: 'linear',
+                                position: 'center',
+                                title: {
+                                    display: true,
+                                    text: 'x'
+                                },
+                                min: -10,
+                                max: 10
+                            },
+                            y: {
+                                type: 'linear',
+                                position: 'center',
+                                title: {
+                                    display: true,
+                                    text: 'y'
+                                },
+                                min: -10,
+                                max: 10
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'y = ax² + bx + c',
+                                font: {
+                                    size: 16
+                                }
+                            },
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+                this.updateChart();
+            }
+            
+            updateChart() {
+                const data = [];
+                for (let x = -10; x <= 10; x += 0.1) {
+                    const y = this.a * x * x + this.b * x + this.c;
+                    data.push({x, y});
+                }
+                
+                this.chart.data.datasets[0].data = data;
+                this.chart.options.plugins.title.text = `y = ${this.a.toFixed(1)}x² + ${this.b.toFixed(1)}x + ${this.c.toFixed(1)}`;
+                this.chart.update();
+            }
+        }
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', () => {
+            new HTMLNotepad();
+            new QuadraticGraph();
+        });
+    </script>
+</body>
+</html>

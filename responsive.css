@@ -1,0 +1,219 @@
+/* 通用响应式样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* 基础样式 */
+body {
+    font-family: 'Microsoft YaHei', 'Arial', sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #fff;
+}
+
+a {
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* 容器样式 */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* 响应式字体大小 */
+:root {
+    --font-size-xs: 0.75rem; /* 12px */
+    --font-size-sm: 0.875rem; /* 14px */
+    --font-size-md: 1rem; /* 16px */
+    --font-size-lg: 1.125rem; /* 18px */
+    --font-size-xl: 1.25rem; /* 20px */
+    --font-size-2xl: 1.5rem; /* 24px */
+    --font-size-3xl: 1.875rem; /* 30px */
+    --font-size-4xl: 2.25rem; /* 36px */
+    --font-size-5xl: 3rem; /* 48px */
+}
+
+/* 媒体查询 - 移动优先 */
+/* 小屏幕 (手机, 小于 640px) */
+@media (max-width: 639px) {
+    h1 {
+        font-size: var(--font-size-3xl);
+    }
+    h2 {
+        font-size: var(--font-size-2xl);
+    }
+    h3 {
+        font-size: var(--font-size-xl);
+    }
+    p {
+        font-size: var(--font-size-sm);
+    }
+}
+
+/* 中等屏幕 (平板, 640px 及以上) */
+@media (min-width: 640px) and (max-width: 1023px) {
+    h1 {
+        font-size: var(--font-size-4xl);
+    }
+    h2 {
+        font-size: var(--font-size-2xl);
+    }
+    h3 {
+        font-size: var(--font-size-xl);
+    }
+    p {
+        font-size: var(--font-size-md);
+    }
+}
+
+/* 大屏幕 (桌面, 1024px 及以上) */
+@media (min-width: 1024px) {
+    h1 {
+        font-size: var(--font-size-5xl);
+    }
+    h2 {
+        font-size: var(--font-size-3xl);
+    }
+    h3 {
+        font-size: var(--font-size-2xl);
+    }
+    p {
+        font-size: var(--font-size-md);
+    }
+}
+
+/* 响应式按钮 */
+.btn {
+    display: inline-block;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-weight: bold;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+/* 响应式网格 */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+/* 响应式导航 */
+.nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+}
+
+/* 作品页面特有样式 */
+.button-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.作品按钮 {
+    padding: 12px 24px;
+    font-size: var(--font-size-md);
+    background-color: #0066cc;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.3s ease;
+    flex: 1 1 200px; /* 基础大小，可伸缩 */
+    max-width: 300px;
+    text-align: center;
+}
+
+@media (max-width: 639px) {
+    .作品按钮 {
+        flex: 1 1 100%; /* 在小屏幕上占满宽度 */
+        max-width: 100%;
+    }
+}
+
+.作品按钮:hover {
+    background-color: #0052a3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* 个人简介页面特有样式 */
+.basic-info, .background {
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 639px) {
+    .basic-info, .background {
+        padding: 15px;
+    }
+}
+
+/* 首页特有样式 */
+.hero-title {
+    font-size: var(--font-size-4xl);
+    margin-bottom: 20px;
+}
+
+.hero-subtitle {
+    font-size: var(--font-size-lg);
+    margin-bottom: 40px;
+    max-width: 90%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+@media (max-width: 639px) {
+    .hero-title {
+        font-size: var(--font-size-3xl);
+    }
+    .hero-subtitle {
+        font-size: var(--font-size-md);
+    }
+}
+
+/* 返回顶部按钮 */
+.back-to-top {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #0066cc;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 100;
+}
+
+.back-to-top.visible {
+    opacity: 1;
+}
+
+.back-to-top:hover {
+    background-color: #0052a3;
+}

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- 背景渐变 -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0f4f8"/>
+      <stop offset="100%" stop-color="#d9e2ec"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="3" dy="3" stdDeviation="5" flood-color="rgba(0,0,0,0.3)"/>
+    </filter>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="100%" height="100%" fill="url(#bgGradient)"/>
+
+  <!-- 显微镜主体 -->
+  <g filter="url(#shadow)">
+    <!-- 底座 -->
+    <rect x="250" y="500" width="300" height="30" rx="15" fill="#334e68"/>
+    <rect x="300" y="450" width="200" height="50" rx="5" fill="#486581"/>
+
+    <!-- 支柱 -->
+    <rect x="380" y="200" width="40" height="250" rx="5" fill="#486581"/>
+
+    <!-- 载物台 -->
+    <rect x="250" y="380" width="300" height="15" rx="2" fill="#2c3e50"/>
+    <rect x="350" y="360" width="100" height="20" rx="2" fill="#334e68"/>
+
+    <!-- 镜筒 -->
+    <rect x="350" y="120" width="100" height="80" rx="5" fill="#486581"/>
+    <circle cx="400" y="120" r="30" fill="#334e68"/>
+    <circle cx="400" y="120" r="20" fill="#2c3e50"/>
+
+    <!-- 物镜 -->
+    <rect x="385" y="200" width="30" height="40" rx="5" fill="#334e68"/>
+    <circle cx="400" y="240" r="15" fill="#2c3e50"/>
+
+    <!-- 目镜 -->
+    <circle cx="400" y="80" r="20" fill="#334e68"/>
+    <circle cx="400" y="80" r="10" fill="#2c3e50"/>
+
+    <!-- 调节旋钮 -->
+    <circle cx="440" y="300" r="15" fill="#2c3e50"/>
+    <circle cx="440" y="300" r="8" fill="#1a2530"/>
+    <circle cx="360" y="350" r="12" fill="#2c3e50"/>
+    <circle cx="360" y="350" r="6" fill="#1a2530"/>
+  </g>
+
+  <!-- 镜片反光效果 -->
+  <circle cx="400" y="80" r="5" fill="white" opacity="0.7" transform="translate(-5,-5)"/>
+  <circle cx="400" y="120" r="8" fill="white" opacity="0.5" transform="translate(3,-3)"/>
+  <circle cx="400" y="240" r="5" fill="white" opacity="0.6" transform="translate(-2,2)"/>
+</svg>

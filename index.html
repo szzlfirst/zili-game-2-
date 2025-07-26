@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>子乐学习</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="responsive.css">
+    <style>
+        body {
+            background-color: #1A0523;
+            background-image: url('images/microscope.svg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            color: black;
+        }
+        .hero-section {
+            text-align: center;
+            padding: 20px;
+            z-index: 10;
+            width: 100%;
+        }
+        .hero-title {
+            margin-bottom: 20px;
+            color: black;
+            font-weight: bold;
+        }
+        .hero-subtitle {
+            margin-bottom: 40px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .navigation {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 100;
+        }
+        @media (max-width: 639px) {
+            .navigation {
+                flex-direction: row;
+                top: auto;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background-color: rgba(0, 0, 0, 0.7);
+                padding: 10px 20px;
+                border-radius: 30px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+        .nav-item {
+            padding: 12px 20px;
+            border-radius: 5px;
+            color: black;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            flex: 1 1 120px;
+            max-width: 200px;
+        }
+        .nav-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(255,255,255,0.2);
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+/* 彩色核苷酸样式已删除 */
+    </style>
+</head>
+<body>
+    <div class="hero-section">
+        <h1 class="hero-title">子乐学习</h1>
+        <p class="hero-subtitle">探索生命科学与技术的交叉点，分享我的学习历程和项目成果</p>
+    </div>
+
+    <div class="navigation">
+        <a href="personal.html?v=1" class="nav-item"><i class="fas fa-user"></i> 个人简介</a>
+        <a href="works.html" class="nav-item"><i class="fas fa-th"></i> 作品总览</a>
+        <a href="生物游戏.html" class="nav-item"><i class="fas fa-gamepad"></i> 生物游戏</a>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
